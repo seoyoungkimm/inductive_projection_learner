@@ -1,7 +1,13 @@
 # phonotactics
 
-This is the Inductive Projection Learner. 
+This is my modification of the Inductive Projection Learner (https://github.com/gouskova/inductive_projection_learner).
 
+It does two things differently than the origianl Inductive Projection Learner: i) it checks whether a restriction observed as a placeholder trigram in the baseline search actually generalizes unboundedly, ii) if the restriction has blockers, it adds those blockers on the tier and projects the smallest natural class that includes interacting classes as well as blockers. 
+
+
+
+
+(below is copied from the original learner)
 It currently does two things, both of which require running the Maxent Phonotactic Learner developed by Colin Wilson. See his Github (colincwilson) for maxent.jar; the version bundled with this should be identical.
 
 You need to have Java 8 installed on your computer. You also need to have Python 3 (at least 3.5).
