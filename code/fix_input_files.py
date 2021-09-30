@@ -30,6 +30,7 @@ def fixFeatureFile(inpath, outpath):
         if "mb" is one of the features, it is interpreted as "morpheme_boundary"--which means that "word boundary" will be +mb,+wb, and "morpheme boundary" will be -wb, +mb. All segments are -mb, -wb 
         """
         newfile = open(os.path.join(outpath,'features.txt'),'w', encoding='utf-8')
+        # print(inpath)
         with open(os.path.join(inpath, 'Features.txt'), 'r', encoding='utf-8') as oldfile:
             lines=oldfile.readlines()
         header = lines[0]

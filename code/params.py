@@ -98,7 +98,7 @@ def scale_params(inpath=None, viol=None, gain=None, consize=None, gamma=None, mu
 
 
 
-def makeParams(violable='violable', consize=50, mingain=50.0, select='gain', gamma=0, maxwdlength=8, pathtoparams=os.getcwd().split('code')[0]+'maxent2/temp/params.txt', compclasses=False, predefault=False, ag_disag=False):
+def makeParams(violable='violable', consize=50, mingain=50.0, select='gain', gamma=0, maxwdlength=8, pathtoparams=os.getcwd().split('code')[0]+'maxent2/temp/params.txt', compclasses=False, predefault=False, ag_disag=False, checkunbounded=False, blocker=False):
         '''
         this creates a basic params.txt file that's passed to the command line version of the UCLAPL.
         most of the parameters should be left alone.
@@ -136,10 +136,18 @@ def makeParams(violable='violable', consize=50, mingain=50.0, select='gain', gam
             paramsdic['maxObsVioln']= {'value': '0', 'comment':'maximum number of observed violations is Zero; it means only inviolable constraints are learned.'}
         elif violable=='inviolable':
             paramsdic['maxObsVioln']={'value': None, 'comment': None}
-        if predefault==True:
+        if predefault:
             paramsdic['grammar']={'value':'baseline_grammar.txt', 'comment': 'wd length constraints and anti-seg constraints pre-included as defaults.'}
-        if ag_disag==True:
+        if ag_disag:
             paramsdic['grammar']={'value':'baseline_grammar.txt', 'comment': 'agree and disagree constraints pre-included in baseline grammar.'}
+        if checkunbounded:
+            paramsdic['grammar']={'value':'baseline_grammar.txt', 'comment': 'baseline constraints and placeholder trigram on either C or V tier pre-included in baseline grammar.'}
+            # paramsdic['select']={'value':None, 'comment':None}
+            del paramsdic['select']
+        if blocker:
+            paramsdic['grammar']={'value':'baseline_grammar.txt', 'comment': 'placeholder trigram with every segment in te middle will be re-evaluated on either C or V tier'}
+            # paramsdic['select']={'value':None, 'comment':None}
+            del paramsdic['select']
         params=open(pathtoparams, 'w', encoding='utf-8')
         for param in paramsdic:
                 line = '-'+ param

@@ -93,7 +93,7 @@ def make_mb_trigrams(fdic, ocp=True, agree=True):
     return conlist
 
 
-def make_gram_file(proj = 'default', path=os.getcwd().split('code')[0], featfilepath=os.path.join(os.getcwd().split('code')[0], 'temp', 'Features.txt')):
+def make_gram_file(proj = 'default', path=os.getcwd().split('code')[0], featfilepath=os.path.join(os.getcwd().split('code')[0], 'maxent2', 'temp', 'Features.txt')):
     fdic = find_feat_values(featfilepath)
     conlist = make_bigrams(fdic)
     conlist.extend(make_edge_trigrams(conlist))

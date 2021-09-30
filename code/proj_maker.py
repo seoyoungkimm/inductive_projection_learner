@@ -98,6 +98,7 @@ def readGrammar(gramfile, newMaxEnt=True):
 					else:
 						middlegram,firstgram,thirdgram=None,None,None
 					gramdic[constraint]={'tier':tier,'weight':weight, 'features':feats, 'middlegram':middlegram, 'firstgram':firstgram, 'thirdgram':thirdgram, 'natclasses':natclasses, 'natclasses_nocomma':natclasses_commaless, 'segblocks':seglist, 'seglists':[x.split('|') for x in seglist]} 
+		# print(gramdic)
 	return gramdic
 	
 
@@ -218,7 +219,7 @@ class PrintFeature:
 
 #writing the projections file
 
-def makeDefaultProj(path, featfile, ngrams=3, CV=False, outwrite=True):
+def makeDefaultProj(path, featfile, CV=False, ngrams=3, outwrite=True):
 	"""
 	The New MaxEnt learner requires a default projection to be defined.
 	arguments: path is the location of the projections file where the output is supposed to be written; 
@@ -230,7 +231,7 @@ def makeDefaultProj(path, featfile, ngrams=3, CV=False, outwrite=True):
 	consonantal=""
 	vocalic=""
 	if CV:
-		features = set(segsFeats(featfile)[2])
+		features = set(segsFeats(featfile)[2]) #  segsFeats(featfile)[2] = a list of feature names 
 		CVfeats = set(['syllabic', 'syll', 'syl'])
 		if len(features & CVfeats)!= 1:
 			CVfeatError = 'Your Features.txt file does not have a C/V feature with a standard name. Please add a feature named "syllabic", "syll", or "syl" and specify the values for all the segments in the list so that a Consonantal and a Vocalic tier can be added to the baseline projection run.'
@@ -252,6 +253,18 @@ def makeDefaultProj(path, featfile, ngrams=3, CV=False, outwrite=True):
 		return([default,consonantal,vocalic])
 		
 
+
+def getSyllabicfeat(featurefile):
+	features = set(segsFeats(featurefile)[2]) #  segsFeats(featfile)[2] = a list of feature names 
+	CVfeats = set(['syllabic', 'syll', 'syl'])
+	if len(features & CVfeats)!= 1:
+		CVfeatError = 'Your Features.txt file does not have a C/V feature with a standard name. Please add a feature named "syllabic", "syll", or "syl" and specify the values for all the segments in the list so that a Consonantal and a Vocalic tier can be added to the baseline projection run.'
+		raise CVfeatError
+	else:	
+		syllabicfeat=list(features & CVfeats)[0]
+	return syllabicfeat
+
+
 #===========================================================================================
 
 def getNatClasses():
@@ -263,15 +276,17 @@ def getNatClasses():
 
 #===========================================================================================
 
-def isNatSubset(cl1, cl2):
+def isNatSubset(cl1, cl2): # returns a subset of two 
 	'''
 	checks if cl1 is a subset of cl2; returns cl1 if true
 	returns cl2 if c1 is a superset of cl1
 	returns 'overlap' and 'disjunctive' if the classes are not in a superset relationship, as approrpiate
 	'''
 	natclasses = getNatClasses()
+	# print(natclasses)
 	segs1 = set(natclasses[cl1]['segments'])
 	segs2 = set(natclasses[cl2]['segments'])
+	# print(segs2)
 	if segs1.issubset(segs2):
 		return(cl1)
 	elif segs2.issubset(segs1):
@@ -281,6 +296,7 @@ def isNatSubset(cl1, cl2):
 	elif len(segs1&segs2)==0:
 		return 'disjunctive'
 
+# print(isNatSubset('+syll', '-high-low'))
 #===========================================================================================
 #the nonzero features associated with a natural class's segments 
 #===========================================================================================
@@ -296,6 +312,7 @@ def findFeatsToProject(featfilepath):
 	segsFeatuple = segsFeats(featfilepath) #first is segslist, then segsnozero, then featnames
 	nclassdic=getNatClasses()
 	for natclass in nclassdic:
+		# print(natclass)
 		nclassdic[natclass]['nonzerofeats']=[]
 		nclassdic[natclass]['featstoproject']=['wb']
 		segs = nclassdic[natclass]['segments']
@@ -303,7 +320,9 @@ def findFeatsToProject(featfilepath):
 		for boundary in ["<#", "#>"]:
 			if boundary in segs:
 				segs.remove(boundary)
+		# print(segs)
 		for seg in segs:
+			# print(seg)
 			for otherseg in segs:
 				try:
 					segentry = segsFeatuple[1][seg]
@@ -322,7 +341,9 @@ def findFeatsToProject(featfilepath):
 			strippedfeat = feat.strip("+-")
 			if strippedfeat not in nclassdic[natclass]['featstoproject']:
 				nclassdic[natclass]['featstoproject'].append(strippedfeat)
+	# print(nclassdic)
 	return nclassdic
+
 
 
 		
@@ -340,7 +361,9 @@ def makeWBProj(pathtogrammarfile, featpathfile, outputpathdir, mb, ngrams = '2\t
 	requires access to natural class information, which is collected previously into featsprintabledic (using proj_maker.findFeatsToProject())
 	"""
 	nclassdic = findFeatsToProject(featpathfile)
+	# print(nclassdic)
 	grammar=readGrammar(pathtogrammarfile)
+	# print(grammar)
 	join_char = '\t' 
 	defproj = ['default', 'any', 'all', str(defaultngram)]
 	projlist = []
@@ -398,6 +421,108 @@ def makeWBProj(pathtogrammarfile, featpathfile, outputpathdir, mb, ngrams = '2\t
 		projection_file.close()
 		print('\ndone making a combo projection file from "-wb"-mentioning constraints')
 
+def makeEvalProj(workingpath, pathtounboundedgrammarfile, pathtoblockergrammarfile, featpathfile, outputpathdir, ngrams = '2', defaultngram=3):
+	'''
+	coded based on makeWBProj
+	'''
+	nclassdic = findFeatsToProject(featpathfile)
+	# grammar=readGrammar(pathtogrammarfile) #baseline grammar
+	grammar_unbounded = readGrammar(pathtounboundedgrammarfile)
+	grammar_unbounded = {x:y for x,y in grammar_unbounded.items() if y['tier']!='default'} # only extract placeholder trigrams that were reweighted
+	# print(grammar_unbounded)
+	if os.path.exists(os.path.join(workingpath, "output_evaluation_blocker")):
+		grammar_blocker = readGrammar(pathtoblockergrammarfile)
+	else: grammar_blocker = None
+
+	join_char = '\t' 
+	defproj = ['default', 'any', 'all', str(defaultngram)]
+	projlist = []
+
+	# combine unbounded and blocker grammars: keys are placeholder trigrams values are grammar_blocker
+	grammar_eval = {}
+	for placeholdertrigram in grammar_unbounded: 
+		allsuperclasses = []
+		# print(placeholdertrigram)
+		natclasses = grammar_unbounded[placeholdertrigram]['natclasses_nocomma'] # a list that looks sth like ['+wb', '+sonorant+RTR', '-RTR']
+		prevclass = natclasses[0]
+		follclass = natclasses[2]
+		if grammar_blocker:
+			grammar_eval[placeholdertrigram] = {x:y for x, y in grammar_blocker.items() if y['natclasses_nocomma'][0] == prevclass and y['natclasses_nocomma'][2] == follclass}
+
+		if grammar_unbounded[placeholdertrigram]['weight'] == '0':
+			print("placeholdertrigram", placeholdertrigram, 
+				"will not be projected in the final search because it did not generalize unboundedly")
+		else: # only projected tiers for unbounded patterns (positive weights)
+			prevsegs = nclassdic[prevclass]['segments']
+			# print(prevsegs)
+			follsegs = nclassdic[follclass]['segments']
+			# print(follsegs)
+			allthesegs = set(prevsegs + follsegs)
+			# print(allthesegs)
+			# going through blocker grammar to see if there are blockers to be also projected
+			if grammar_blocker:
+				# print("detecting blockers for the placeholder trigram: ", placeholdertrigram) 
+				detected_blockers = []
+				for seg_constraint in grammar_eval[placeholdertrigram]:
+					# print(seg_constraint)
+					blocker_natclasses = grammar_eval[placeholdertrigram][seg_constraint]['natclasses_nocomma']
+					# print(blocker_natclasses)
+					# print(grammar_eval[placeholdertrigram][seg_constraint]['weight'])
+					if grammar_eval[placeholdertrigram][seg_constraint]['weight'] == '0': 
+						blocker_seg = nclassdic[blocker_natclasses[1]]['segments']
+						# print(blocker_seg)
+						detected_blockers.extend(blocker_seg)
+						print(blocker_seg, "was added to the", allthesegs, "tier")
+						allthesegs.update(blocker_seg)
+				if len(detected_blockers) == 0: detected_blockers = "None"
+				else: detected_blockers = ','.join(detected_blockers)
+			# if evaluation didn't reach to blocker detection phase, then nothing happens
+
+			try:
+				superclasses = sorted([x for x in nclassdic if set(nclassdic[x]['segments']).issuperset(allthesegs) and x!='' and x not in ['-wb', '-mb']], key=lambda x: len(nclassdic[x]['segments']))
+			except:
+				print(c)
+				print('\n\n\n\n')
+				print(natclasses)
+				print('\n\n\n\n')
+				print(grammar)
+				print('\n\n\n\n')
+				print(nclassdic)
+
+			if len(superclasses)>0:
+				smallest = superclasses[0]
+				# print(nclassdic[smallest]['segments'])
+				allsuperclasses.extend([x for x in superclasses if len(nclassdic[x]['segments']) == len(nclassdic[smallest]['segments'])]) 
+				if len(allsuperclasses)>1:
+					print('\nplaceholder constraint found: ' +placeholdertrigram + ' \nconstructed several projections for natural classes because there is more than one superset natural class encompassing the segments to either side of the placeholder, and there is no "shortest" class')
+				elif len(allsuperclasses)==1:
+					print('\nplaceholder constraint found: ' + placeholdertrigram + '\nblocker detected: ' + detected_blockers + '\nconstructed a projection for the smallest natural class : \n' + smallest)
+					# print(detected_blockers)
+			else:
+				print('\nplaceholder constraint found: ' + placeholdertrigram + '\nbut, no superset classes exist that include both classes to either side of the placeholder')
+			projlist.extend(allsuperclasses)
+
+	projlist = list(set(projlist))
+	# print(projlist)
+	if len(projlist)==0:
+			print('no placeholder constraints were found in the baseline grammar.')
+	else:    
+		projection_file = open(os.path.join(outputpathdir, 'projections.txt'), 'w', encoding='utf-8')
+		projection_file.write(join_char.join(defproj) + '\n')
+		for cl in projlist:
+			if (cl == '+mb') or (cl == '-wb+mb'):
+				continue
+			else:
+				feats_to_project = ','.join(nclassdic[cl]['featstoproject'])
+				defin_feats = nclassdic[cl]['classname']
+				projection_file.write(join_char.join([cl, defin_feats, feats_to_project, str(ngrams)+'\n']))
+		projection_file.close()
+		print('\ndone making a combo projection file from "-wb"-mentioning constraints')
+
+
+# makeEvalProj("/Users/seoyoungkim/Desktop/UMass/2019_Fall/Independent_study/inductive_projection_learner-master/sims/2021-08-30_shona_verbs_wb_vi_gain190_con250_gam0/output_evaluation_unbounded/output_final/grammar.txt", "/Users/seoyoungkim/Desktop/UMass/2019_Fall/Independent_study/inductive_projection_learner-master/sims/2021-08-30_shona_verbs_wb_vi_gain190_con250_gam0/output_evaluation_blocker/output_final/grammar.txt", "/Users/seoyoungkim/Desktop/UMass/2019_Fall/Independent_study/inductive_projection_learner-master/data/shona/verbs/Features.txt", "/Users/seoyoungkim/Desktop/UMass/2019_Fall/Independent_study/inductive_projection_learner-master/maxent2/temp")
+
+# makeEvalProj("/Users/seoyoungkim/Desktop/UMass/2019_Fall/Independent_study/inductive_projection_learner-master/sims/Prospectus/2020-10-15_latin_wb_vi_gain50_con150_this/output_evaluation_unbounded/output_final/grammar.txt", "/Users/seoyoungkim/Desktop/UMass/2019_Fall/Independent_study/inductive_projection_learner-master/sims/Prospectus/2020-10-15_latin_wb_vi_gain50_con150_this/output_evaluation_blocker_all/output_final/grammar.txt", "/Users/seoyoungkim/Desktop/UMass/2019_Fall/Independent_study/inductive_projection_learner-master/data/latin/Features.txt", "/Users/seoyoungkim/Desktop/UMass/2019_Fall/Independent_study/inductive_projection_learner-master/maxent2/temp")
 
 #=========================================================================================
 # a custom projection maker given a feature value
@@ -410,5 +535,10 @@ def makeHandmadeProj(pathtoprojfile, feature, featpathfile, ngrams="2\t3", defau
 	projection_file.write(join_char.join(defproj)+'\n')
 	projection_file.write(join_char.join([feature, feature, feats_to_project, str(ngrams)]))
 	projection_file.close()
+
+
+
+
+
 
 

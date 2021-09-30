@@ -82,25 +82,36 @@ def run_wb_sim(language, viol, mgain, nconstraints, mb, gam, parameters, reducem
     this learning simulation is described in Gouskova and Gallagher (NLLT). The learner starts with a baseline
     grammar; if this grammar contains placeholder trigrams, it creates projections for each distinct trigram and runs a final simulation with those projections available.
     '''
-    basepath = os.getcwd().split('code')[0]
+    basepath = os.getcwd().split('code')[0] # /Users/seoyoungkim/Desktop/UMass/2019_Fall/Independent_study/inductive_projection_learner-master
     simfunc.cleanUpWorkdir(basepath)
+    vio = viol[0:2]
+    wrapstring = os.path.join('sims',language.replace(os.sep,"_")) + "_" + '_'.join(['wb',vio,'gain'+str(mgain),'con'+str(nconstraints),'gam'+str(gam)])
     if parameters: 
         params.move_params(os.path.join(basepath, 'data', language, 'params.txt'))
         viol, mgain, nconstraints,gamma  = params.read_params()
     else:
         params.makeParams(consize=nconstraints, violable=viol, mingain=mgain, gamma=gam, predefault=False)
     simfunc.makeSimFiles(language)
-    #baseline simulation
-    simfunc.runBaselineSim(basepath, reducemem=reducemem)
-    #analyze resulting grammar.txt file, make projections for each wb-mentioning constraint
-    simfunc.makeProjection(basepath, 'wb', mb)
-    if len(os.listdir('projections'))==0:
+    simfunc.runBaselineSim(basepath, reducemem=reducemem, CV=False)
+    # print(simpath)
+    baselinepath = os.path.join(basepath, 'output_baseline')
+    pathtogrammarfile = os.path.join(baselinepath, 'grammar.txt')
+    grammar, placeholderlist = simfunc.pickTrigrams(pathtogrammarfile)
+    if len(placeholderlist) == 0: 
         print('\nNo projections were found because there were no placeholder constraints in the baseline grammar.')
     else:
-        simfunc.runCustomSim(reducemem=reducemem, simtype= 'wb')
-    vio = viol[0:2]
-    wrapstring = os.path.join('sims',language.replace(os.sep,"_")) + "_" + '_'.join(['wb',vio,'gain'+str(mgain),'con'+str(nconstraints)])
-    return simfunc.wrapSims(wrapstring, ret=True)
+        simfunc.tierInspector(language)
+        # only project important ones: Based on the result of EvalSim, project a tier or not
+        if len(os.listdir('projections'))==0:
+            print('\nNo projections were found because restrictions in baseline trigrams did not generalize unboundedly.')
+        else:
+            if parameters: 
+                params.move_params(os.path.join(basepath, 'data', language, 'params.txt'))
+                viol, mgain, nconstraints,gamma  = params.read_params()
+            else:
+                params.makeParams(consize=nconstraints, violable=viol, mingain=mgain, gamma=gam, predefault=False)
+            simfunc.runCustomSim(reducemem=reducemem, simtype= 'wb')
+    return simfunc.wrapSims(wrapstring, ret=True, cust=False)
 
 
 def run_baseline_sim(language, viol, mgain, nconstraints, mb, gam, parameters, reducemem):
@@ -110,7 +121,7 @@ def run_baseline_sim(language, viol, mgain, nconstraints, mb, gam, parameters, r
     '''
     basepath = os.getcwd().split('code')[0]
     lgfullpath = os.path.join(basepath, 'data', language)
-    simfunc.cleanUpWorkdir(basepath)
+    # simfunc.cleanUpWorkdir(basepath)
     if parameters: 
         params.move_params(os.path.join(lgfullpath, 'params.txt'))
         viol, mgain, nconstraints, gam = params.read_params()
@@ -118,13 +129,13 @@ def run_baseline_sim(language, viol, mgain, nconstraints, mb, gam, parameters, r
         params.makeParams(consize=nconstraints, violable=viol, mingain=mgain, gamma=gam, predefault=False)
     simfunc.makeSimFiles(lgfullpath)
     try:
-        simfunc.runBaselineSim(basepath, reducemem=reducemem)
+        simfunc.runBaselineSim(basepath, reducemem=reducemem, CV=False)
         #language=language.split('../data/')[1].replace('/','_')
         wrapstring = os.path.join('sims', language.replace(os.sep, "_") +'_baseline' + '_gain'+mgain + '_con' + nconstraints)
         simfunc.wrapSims(wrapstring)
     except CalledProcessError:
         print("Done")
-
+    return wrapstring
 
 def run_agree_disagree_sim(language, viol, mgain, nconstraints, mb, gam, parameters,reducemem):
     '''
@@ -169,6 +180,11 @@ def run_handmade_projection_sim(language, viol, mgain, nconstraints, gam, parame
         shutil.rmtree(basepath+'output_baseline')
     simfunc.wrapSims(os.path.join('sims', '_'.join(language.replace(os.sep, "_"), 'custom')), cust=True)
 
+
+
+
+
+
 def test_grammar(grammarfile, testfile):
     basepath = os.getcwd().split('code')[0]
     grammardir = grammarfile.split('grammar.txt')[0]
@@ -193,8 +209,10 @@ def save_program_trace(learnsim, language, viol, mgain, nconstraints, mb, gam, p
         stuff = learnsim(language, viol, mgain, nconstraints, mb, gam, parameters, reducemem=reducemem)
     out.write(progtrace.getvalue())
     out.close()
+    print(basepath)
+    print(stuff)
     shutil.move(os.path.join(basepath, 'program_trace.txt'), os.path.join(basepath, stuff, 'program_trace.txt'))
-    print(os.path.join(basepath, stuff))
+    # print(os.path.join(basepath, stuff))
     return os.path.join(basepath, stuff)
 
 if __name__=='__main__':
@@ -279,3 +297,8 @@ if __name__=='__main__':
                     outdir=save_program_trace(run_mbsublex_sim, filepath, learnviolable, mingain, ncons, mb, gam, parameters, reducemem)
                 except IndexError:
                     print(HelpMessage)
+            # elif 'reweight' in sys.argv:
+            #     try:
+            #         outdir=save_program_trace(run_reweight, filepath, learnviolable, mingain, ncons, mb, gam, parameters, reducemem)
+            #     except IndexError:
+            #         print (HelpMessage)
